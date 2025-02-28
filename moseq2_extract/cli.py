@@ -140,6 +140,11 @@ def common_roi_options(function):
         help="Size of cv2 Structure Element to erode roi.",
     )(function)
     function = click.option(
+        '--bg-v2',
+        is_flag=True,
+        help="Flag to adaptively use best quantile for computing background",
+    )(function)
+    function = click.option(
         "--erode-iterations",
         default=0,
         type=int,

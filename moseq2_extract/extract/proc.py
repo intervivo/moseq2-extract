@@ -86,7 +86,7 @@ def get_largest_cc(frames, progress_bar=False):
     return foreground_obj
 
 
-def get_bground_im_file(frames_file, frame_stride=500, med_scale=5, output_dir=None, **kwargs):
+def get_bground_im_file(frames_file, frame_stride=250, med_scale=5, output_dir=None, **kwargs):
     """
     Load or compute background from file.
 
@@ -123,8 +123,31 @@ def get_bground_im_file(frames_file, frame_stride=500, med_scale=5, output_dir=N
                                                           finfo=finfo, 
                                                           **kwargs).squeeze()
             frame_store.append(cv2.medianBlur(frs, med_scale))
+        
+        frame_store = np.array(frame_store).astype('float32')
 
-        bground = np.nanmedian(frame_store, axis=0)
+        if kwargs.get("bg_v2", False):
+            # run an optimization to determine the smoothest quantile to sample from
+
+            # get rid of zeros
+            frame_store[frame_store == 0] = np.nan
+
+            smooth_outputs = {}
+            for q in np.arange(0.5, 1.0, 0.1):
+                bground = np.nanquantile(frame_store, q, axis=0)
+                gx = cv2.Sobel(bground, cv2.CV_64F, 1, 0, ksize=5)
+                gy = cv2.Sobel(bground, cv2.CV_64F, 0, 1, ksize=5)
+                gmag = cv2.magnitude(gx, gy)
+                smooth_outputs[q] = np.nanmean(gmag)
+            # get key for max smoothness
+            q = min(smooth_outputs, key=smooth_outputs.get)
+            bground = np.nanquantile(frame_store, q, axis=0)
+
+        else:
+            bground = np.nanmedian(frame_store, axis=0)
+
+        # add zeros back
+        bground = np.nan_to_num(bground)
 
         write_image(bground_path, bground, scale=True)
     else:
